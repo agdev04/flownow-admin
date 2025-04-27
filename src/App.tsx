@@ -1,6 +1,3 @@
-import { useState } from 'preact/hooks'
-import preactLogo from './assets/preact.svg'
-import viteLogo from '/vite.svg'
 import './app.css'
 import { SignIn, SignedIn, SignedOut, UserButton } from '@clerk/clerk-react'
 import { MeditationsTable } from './MeditationsTable'

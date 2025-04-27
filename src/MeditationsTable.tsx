@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'preact/hooks'
 import { useAuth } from '@clerk/clerk-react'
+import './styles/meditation.css'
 
 interface Meditation {
   id: string
@@ -11,6 +12,8 @@ interface Meditation {
   image_url?: string
   audio_url?: string
 }
+
+type EditingMeditation = Meditation | null
 
 export function MeditationsTable() {
   const { getToken } = useAuth()
@@ -28,6 +31,8 @@ export function MeditationsTable() {
   })
   const [formError, setFormError] = useState<string | null>(null)
   const [formLoading, setFormLoading] = useState(false)
+  const [editingMeditation, setEditingMeditation] = useState<EditingMeditation>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   useEffect(() => {
     async function fetchMeditations() {
@@ -35,14 +40,18 @@ export function MeditationsTable() {
       setError(null)
       try {
         const token = await getToken()
-        const res = await fetch('https://b88g8kk0k0owcgw08ocgg8gk.coolify.agnieve.com/meditations/', {
+        const url = editingMeditation
+        ? `https://b88g8kk0k0owcgw08ocgg8gk.coolify.agnieve.com/meditations/${editingMeditation.id}`
+        : 'https://b88g8kk0k0owcgw08ocgg8gk.coolify.agnieve.com/meditations/'
+      
+      const res = await fetch(url, {
           headers: {
             Authorization: `Bearer ${token}`
           }
         })
         if (!res.ok) throw new Error('Failed to fetch meditations')
         const data = await res.json()
-        setMeditations(Array.isArray(data) ? data : [])
+        setMeditations(Array.isArray(data.meditations) ? data.meditations : [])
       } catch (err: any) {
         setError(err.message || 'Unknown error')
       } finally {
@@ -51,6 +60,40 @@ export function MeditationsTable() {
     }
     fetchMeditations()
   }, [getToken])
+
+  async function handleDelete(meditation: Meditation) {
+    if (!confirm('Are you sure you want to delete this meditation?')) return
+    
+    setIsDeleting(true)
+    try {
+      const token = await getToken()
+      const res = await fetch(`https://b88g8kk0k0owcgw08ocgg8gk.coolify.agnieve.com/meditations/${meditation.id}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      })
+      if (!res.ok) throw new Error('Failed to delete meditation')
+      setMeditations(meds => meds.filter(m => m.id !== meditation.id))
+    } catch (err: any) {
+      setError(err.message || 'Failed to delete meditation')
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
+  async function handleEdit(meditation: Meditation) {
+    setEditingMeditation(meditation)
+    setForm({
+      title: meditation.title,
+      description: meditation.description,
+      category: meditation.category || '',
+      tags: meditation.tags?.join(', ') || '',
+      script: meditation.script || '',
+      image_url: meditation.image_url || '',
+      audio_url: meditation.audio_url || ''
+    })
+  }
 
   async function handleSubmit(e: Event) {
     e.preventDefault()
@@ -62,8 +105,12 @@ export function MeditationsTable() {
     setFormLoading(true)
     try {
       const token = await getToken()
-      const res = await fetch('https://b88g8kk0k0owcgw08ocgg8gk.coolify.agnieve.com/meditations/', {
-        method: 'POST',
+      const url = editingMeditation
+        ? `https://b88g8kk0k0owcgw08ocgg8gk.coolify.agnieve.com/meditations/${editingMeditation.id}`
+        : 'https://b88g8kk0k0owcgw08ocgg8gk.coolify.agnieve.com/meditations/'
+      
+      const res = await fetch(url, {
+        method: editingMeditation ? 'PUT' : 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -83,6 +130,7 @@ export function MeditationsTable() {
         throw new Error(errData.message || 'Failed to create meditation')
       }
       setForm({ title: '', description: '', category: '', tags: '', script: '', image_url: '', audio_url: '' })
+      setEditingMeditation(null)
       setFormError(null)
       // Refetch meditations
       setLoading(true)
@@ -99,46 +147,63 @@ export function MeditationsTable() {
     }
   }
 
-  if (loading) return <div>Loading meditations...</div>
-  if (error) return <div style={{color:'red'}}>Error: {error}</div>
+  if (loading) return <div className="loading-state">Loading meditations...</div>
+  if (error) return <div className="error-state">Error: {error}</div>
 
   return (
-    <div>
-      <form onSubmit={handleSubmit} style={{marginBottom:'2rem',border:'1px solid #eee',padding:'1rem',borderRadius:'8px',background:'#fafbfc'}}>
-        <h3 style={{marginTop:0}}>Create Meditation</h3>
-        <div style={{display:'flex',flexWrap:'wrap',gap:'1rem'}}>
-          <input style={{flex:'1 1 200px',padding:'8px'}} placeholder="Title*" value={form.title} onInput={e => setForm(f => ({...f, title: (e.target as HTMLInputElement).value}))} />
-          <input style={{flex:'1 1 200px',padding:'8px'}} placeholder="Description*" value={form.description} onInput={e => setForm(f => ({...f, description: (e.target as HTMLInputElement).value}))} />
-          <input style={{flex:'1 1 150px',padding:'8px'}} placeholder="Category" value={form.category} onInput={e => setForm(f => ({...f, category: (e.target as HTMLInputElement).value}))} />
-          <input style={{flex:'1 1 150px',padding:'8px'}} placeholder="Tags (comma separated)" value={form.tags} onInput={e => setForm(f => ({...f, tags: (e.target as HTMLInputElement).value}))} />
+    <div className="meditation-container">
+      <form onSubmit={handleSubmit} className="meditation-form">
+        <h3 className="form-title">{editingMeditation ? 'Edit Meditation' : 'Create Meditation'}</h3>
+        <div className="form-group">
+          <input className="form-input" placeholder="Title*" value={form.title} onInput={e => setForm(f => ({...f, title: (e.target as HTMLInputElement).value}))} />
+          <input className="form-input" placeholder="Description*" value={form.description} onInput={e => setForm(f => ({...f, description: (e.target as HTMLInputElement).value}))} />
+          <input className="form-input" placeholder="Category" value={form.category} onInput={e => setForm(f => ({...f, category: (e.target as HTMLInputElement).value}))} />
+          <input className="form-input" placeholder="Tags (comma separated)" value={form.tags} onInput={e => setForm(f => ({...f, tags: (e.target as HTMLInputElement).value}))} />
         </div>
-        <div style={{display:'flex',flexWrap:'wrap',gap:'1rem',marginTop:'1rem'}}>
-          <input style={{flex:'1 1 200px',padding:'8px'}} placeholder="Image URL" value={form.image_url} onInput={e => setForm(f => ({...f, image_url: (e.target as HTMLInputElement).value}))} />
-          <input style={{flex:'1 1 200px',padding:'8px'}} placeholder="Audio URL" value={form.audio_url} onInput={e => setForm(f => ({...f, audio_url: (e.target as HTMLInputElement).value}))} />
+        <div className="form-group">
+          <input className="form-input" placeholder="Image URL" value={form.image_url} onInput={e => setForm(f => ({...f, image_url: (e.target as HTMLInputElement).value}))} />
+          <input className="form-input" placeholder="Audio URL" value={form.audio_url} onInput={e => setForm(f => ({...f, audio_url: (e.target as HTMLInputElement).value}))} />
         </div>
-        <div style={{marginTop:'1rem'}}>
-          <textarea style={{width:'100%',padding:'8px',minHeight:'60px'}} placeholder="Script" value={form.script} onInput={e => setForm(f => ({...f, script: (e.target as HTMLTextAreaElement).value}))} />
+        <div className="form-group">
+          <textarea className="form-textarea" placeholder="Script" value={form.script} onInput={e => setForm(f => ({...f, script: (e.target as HTMLTextAreaElement).value}))} />
         </div>
-        {formError && <div style={{color:'red',marginTop:'0.5rem'}}>{formError}</div>}
-        <button type="submit" disabled={formLoading} style={{marginTop:'1rem',padding:'8px 16px',background:'#1976d2',color:'#fff',border:'none',borderRadius:'4px',cursor:formLoading?'not-allowed':'pointer'}}>
-          {formLoading ? 'Creating...' : 'Create Meditation'}
+        {formError && <div className="form-error">{formError}</div>}
+        <button type="submit" disabled={formLoading} className="submit-button">
+          {formLoading ? (editingMeditation ? 'Updating...' : 'Creating...') : (editingMeditation ? 'Update Meditation' : 'Create Meditation')}
         </button>
       </form>
-      {(!meditations.length) ? <div>No meditations found.</div> : (
-        <table style={{width:'100%',borderCollapse:'collapse',marginTop:'1rem'}}>
+      {(!meditations.length) ? <div className="empty-state">No meditations found.</div> : (
+        <table className="meditations-table">
           <thead>
             <tr>
-              <th style={{border:'1px solid #ccc',padding:'8px'}}>ID</th>
-              <th style={{border:'1px solid #ccc',padding:'8px'}}>Title</th>
-              <th style={{border:'1px solid #ccc',padding:'8px'}}>Description</th>
+              <th>ID</th>
+              <th>Title</th>
+              <th>Description</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
             {meditations.map(med => (
               <tr key={med.id}>
-                <td style={{border:'1px solid #ccc',padding:'8px'}}>{med.id}</td>
-                <td style={{border:'1px solid #ccc',padding:'8px'}}>{med.title}</td>
-                <td style={{border:'1px solid #ccc',padding:'8px'}}>{med.description}</td>
+                <td>{med.id}</td>
+                <td>{med.title}</td>
+                <td>{med.description}</td>
+                <td>
+                  <button 
+                    onClick={() => handleEdit(med)} 
+                    className="action-button edit"
+                    disabled={isDeleting}
+                  >
+                    Edit
+                  </button>
+                  <button 
+                    onClick={() => handleDelete(med)} 
+                    className="action-button delete"
+                    disabled={isDeleting}
+                  >
+                    Delete
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>
