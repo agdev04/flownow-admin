@@ -13,7 +13,12 @@ if (!publishableKey) {
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <ClerkProvider publishableKey={publishableKey}>
-      <App />
+      <div style={{
+        width: '100vw',
+        padding: '1rem',
+      }}>
+        <App />
+      </div>
     </ClerkProvider>
   </React.StrictMode>,
 )

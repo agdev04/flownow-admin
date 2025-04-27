@@ -7,7 +7,7 @@ interface Meditation {
   title: string
   description: string
   category?: string
-  tags?: string[]
+  tags?: string
   script?: string
   image_url?: string
   audio_url?: string
@@ -33,6 +33,7 @@ export function MeditationsTable() {
   const [formLoading, setFormLoading] = useState(false)
   const [editingMeditation, setEditingMeditation] = useState<EditingMeditation>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   useEffect(() => {
     async function fetchMeditations() {
@@ -40,9 +41,8 @@ export function MeditationsTable() {
       setError(null)
       try {
         const token = await getToken()
-        const url = editingMeditation
-        ? `https://b88g8kk0k0owcgw08ocgg8gk.coolify.agnieve.com/meditations/${editingMeditation.id}`
-        : 'https://b88g8kk0k0owcgw08ocgg8gk.coolify.agnieve.com/meditations/'
+        // Initial fetch should always get the full list
+        const url = 'https://b88g8kk0k0owcgw08ocgg8gk.coolify.agnieve.com/meditations/'
       
       const res = await fetch(url, {
           headers: {
@@ -51,7 +51,9 @@ export function MeditationsTable() {
         })
         if (!res.ok) throw new Error('Failed to fetch meditations')
         const data = await res.json()
-        setMeditations(Array.isArray(data.meditations) ? data.meditations : [])
+        // Assuming the API returns an array directly or an object with a 'meditations' key
+        // Let's align with handleSubmit's refetch which expects a direct array
+        setMeditations(Array.isArray(data) ? data : (Array.isArray(data.meditations) ? data.meditations : []))
       } catch (err: any) {
         setError(err.message || 'Unknown error')
       } finally {
@@ -59,7 +61,7 @@ export function MeditationsTable() {
       }
     }
     fetchMeditations()
-  }, [getToken])
+  }, [refreshTrigger])
 
   async function handleDelete(meditation: Meditation) {
     if (!confirm('Are you sure you want to delete this meditation?')) return
@@ -74,7 +76,10 @@ export function MeditationsTable() {
         }
       })
       if (!res.ok) throw new Error('Failed to delete meditation')
-      setMeditations(meds => meds.filter(m => m.id !== meditation.id))
+      // Update local state instead of refetching
+      setMeditations(prevMeditations => prevMeditations.filter(m => m.id !== meditation.id))
+      setError(null) // Clear previous errors on successful delete
+      setRefreshTrigger(prev => prev + 1); // Trigger refresh after delete
     } catch (err: any) {
       setError(err.message || 'Failed to delete meditation')
     } finally {
@@ -84,11 +89,12 @@ export function MeditationsTable() {
 
   async function handleEdit(meditation: Meditation) {
     setEditingMeditation(meditation)
+    
     setForm({
       title: meditation.title,
       description: meditation.description,
       category: meditation.category || '',
-      tags: meditation.tags?.join(', ') || '',
+      tags: meditation.tags|| '',
       script: meditation.script || '',
       image_url: meditation.image_url || '',
       audio_url: meditation.audio_url || ''
@@ -129,21 +135,25 @@ export function MeditationsTable() {
         const errData = await res.json().catch(() => ({}))
         throw new Error(errData.message || 'Failed to create meditation')
       }
+      const updatedMeditation = await res.json() // Assuming the API returns the created/updated meditation
+
       setForm({ title: '', description: '', category: '', tags: '', script: '', image_url: '', audio_url: '' })
       setEditingMeditation(null)
       setFormError(null)
-      // Refetch meditations
-      setLoading(true)
-      const getRes = await fetch('https://b88g8kk0k0owcgw08ocgg8gk.coolify.agnieve.com/meditations/', {
-        headers: { Authorization: `Bearer ${token}` }
-      })
-      const data = await getRes.json()
-      setMeditations(Array.isArray(data) ? data : [])
+
+      // Update local state instead of refetching
+      if (editingMeditation) {
+        setRefreshTrigger(prev => prev + 1); // Trigger refresh after create/update
+      } else {
+        // Add new meditation
+        setMeditations(prevMeditations => [...prevMeditations, updatedMeditation])
+        setRefreshTrigger(prev => prev + 1); // Trigger refresh after create/update
+      }
     } catch (err: any) {
       setFormError(err.message || 'Unknown error')
     } finally {
       setFormLoading(false)
-      setLoading(false)
+      // No need to set loading false here as we are not refetching
     }
   }
 

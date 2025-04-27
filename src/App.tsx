@@ -6,7 +6,15 @@ export function App() {
   // const [count, setCount] = useState(0)
 
   return (
-    <>
+    <div style={{
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      height: '100vh',
+      width: '100%',
+      backgrooundColor: 'red'
+    }}>
       <SignedIn>
         <UserButton afterSignOutUrl="/" />
         <MeditationsTable />
@@ -16,6 +24,6 @@ export function App() {
           <SignIn routing="hash" />
         </div>
       </SignedOut>
-    </>
+    </div>
   )
 }
