@@ -10,7 +10,7 @@ export function App() {
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
-      justifyContent: 'center',
+      justifyContent: 'start',
       height: '100vh',
       width: '100%',
       backgrooundColor: 'red'
